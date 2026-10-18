@@ -39,8 +39,6 @@
     }
 
     function failQuietly() {
-      window.clearTimeout(minuteTimer);
-      minuteTimer = 0;
       cancelGesture();
       clearMotion();
     }
@@ -78,19 +76,24 @@
       window.clearTimeout(minuteTimer);
       minuteTimer = 0;
       if (suspended || document.hidden) return;
-      const time = window.portfolioTime;
-      if (time?.getSnapshot && time.parseOverride) {
-        const snapshot = time.getSnapshot(new Date(), time.parseOverride(window.location.search));
-        if (root.dataset.mascotScene !== snapshot.scene) clearMotion();
-        root.dataset.mascotScene = snapshot.scene;
-        mascot?.setAttribute("aria-label", sceneLabels[snapshot.scene] || "A small ghost");
-        if (clock) {
-          clock.textContent = snapshot.text;
-          clock.dateTime = snapshot.datetime;
-          clock.hidden = false;
+      try {
+        const time = window.portfolioTime;
+        if (time?.getSnapshot && time.parseOverride) {
+          const snapshot = time.getSnapshot(new Date(), time.parseOverride(window.location.search));
+          if (root.dataset.mascotScene !== snapshot.scene) clearMotion();
+          root.dataset.mascotScene = snapshot.scene;
+          mascot?.setAttribute("aria-label", sceneLabels[snapshot.scene] || "A small ghost");
+          if (clock) {
+            clock.textContent = snapshot.text;
+            clock.dateTime = snapshot.datetime;
+            clock.hidden = false;
+          }
         }
+      } catch {
+        // A transient enhancement failure must not stop future clock updates.
+      } finally {
+        if (!suspended && !document.hidden) minuteTimer = window.setTimeout(updateTime, 60000 - (Date.now() % 60000) + 25);
       }
-      minuteTimer = window.setTimeout(guard(updateTime), 60000 - (Date.now() % 60000) + 25);
     }
 
     function syncOwnerAccess() {
@@ -122,6 +125,7 @@
 
     if (mascot) {
       mascot.addEventListener("pointerdown", guard(event => {
+        updateTime();
         if (!event.isPrimary || event.button !== 0) {
           cancelGesture();
           return;
@@ -155,6 +159,7 @@
       mascot.addEventListener("pointerleave", guard(() => { if (gesture) cancelGesture(); }));
       mascot.addEventListener("lostpointercapture", guard(() => { if (gesture) cancelGesture(); }));
       mascot.addEventListener("click", guard(event => {
+        updateTime();
         if (suppressClick) {
           suppressClick = false;
           event.preventDefault();
@@ -187,7 +192,8 @@
     document.addEventListener("visibilitychange", guard(() => { if (document.hidden) pause(); else resume(); }));
     window.addEventListener("pagehide", guard(pause));
     window.addEventListener("pageshow", guard(resume));
-    window.addEventListener("popstate", guard(syncOwnerAccess));
+    window.addEventListener("focus", guard(resume));
+    window.addEventListener("popstate", guard(resume));
     reduced.addEventListener("change", guard(clearMotion));
     resume();
   }
