@@ -34,6 +34,7 @@ Source: https://github.com/tabler/tabler-icons
 Revision: a4ce1404bc6d24d3c365afe7b258d6bf6f48d62d
 Original file: icons/outline/satellite.svg, stored unchanged in art/satellite.svg.
 art/satellite.json is a local 28-column, 16-row ASCII derivative split into body
-and signal layers. The conversion samples a monochrome raster of the SVG.
+and signal layers. The initial raster conversion was hand-refined into outlined
+solar panels, an instrument body and a directional dish with separate signal arcs.
 Converter research: https://www.asciiart.eu/image-to-ascii and https://asciiart.club/
 License: icons/Tabler-LICENSE.txt (MIT), Copyright (c) 2020-2026 Paweł Kuna.

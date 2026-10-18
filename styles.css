@@ -314,22 +314,24 @@ html:not([data-owner-access="visible"]) .owner-access--discreet { display: none 
 @keyframes mascot-evening { 0%,100% { transform: translateX(0) rotate(0deg); } 40% { transform: translateX(-1px) rotate(-5deg); } 70% { transform: translateX(1px) rotate(4deg); } }
 @keyframes mascot-night { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-1px) scale(1.02,.98); } }
 
-/* A small, local ASCII satellite lives outside the reading column on desktop. */
+/* The full satellite footprint stays in a measured gutter outside the reading column. */
 .ascii-satellite { display: none; }
 @media (min-width: 1100px) and (hover: hover) and (pointer: fine) {
-  .ascii-satellite { position: absolute; top: .25rem; left: calc(100% + 1.5rem); display: grid; place-items: center; width: 12rem; height: 12rem; margin: 0; padding: 0; border: 0; color: var(--muted); background: transparent; isolation: isolate; }
-  .ascii-satellite > pre { grid-area: 1 / 1; margin: 0; padding: 0; font: 400 .667rem/1.05 ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace; letter-spacing: 0; white-space: pre; overflow-wrap: normal; pointer-events: none; user-select: none; }
+  .ascii-satellite { position: fixed; z-index: 2; top: 0; left: 0; display: grid; place-items: center; width: 12rem; height: 12rem; margin: 0; padding: 0; border: 0; color: var(--muted); background: transparent; isolation: isolate; cursor: grab; touch-action: none; transition: opacity 100ms; }
+  .ascii-craft { display: grid; place-items: center; pointer-events: none; }
+  .ascii-craft > pre { grid-area: 1 / 1; margin: 0; padding: 0; font: 400 .667rem/1.05 ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace; letter-spacing: 0; white-space: pre; overflow-wrap: normal; pointer-events: none; user-select: none; }
   .ascii-signal { opacity: .55; }
   .ascii-satellite:is(:hover,:focus-visible) { color: var(--ink); }
-  .ascii-satellite:active { transform: none; opacity: .75; }
+  .ascii-satellite:active { opacity: .8; }
+  .ascii-satellite.is-dragging { cursor: grabbing; }
   .ascii-satellite.is-sending .ascii-body { animation: satellite-drift 1600ms var(--motion-ease); }
   .ascii-satellite.is-sending .ascii-signal-near { animation: satellite-signal-near 1600ms ease-out; }
   .ascii-satellite.is-sending .ascii-signal-far { animation: satellite-signal-far 1600ms ease-out; }
 }
 @media (any-pointer: coarse) { .ascii-satellite { display: none; } }
 @keyframes satellite-drift { 0%,100% { transform: translate(0,0) rotate(0deg); } 35% { transform: translate(-1px,-2px) rotate(-2deg); } 70% { transform: translate(0,-1px) rotate(1deg); } }
-@keyframes satellite-signal-near { 0%,100% { opacity: .55; } 15% { opacity: .15; } 35%,55% { opacity: 1; } 80% { opacity: .55; } }
-@keyframes satellite-signal-far { 0%,100% { opacity: .55; } 15%,35% { opacity: .15; } 60%,75% { opacity: 1; } }
+@keyframes satellite-signal-near { 0%,100% { opacity: .55; transform: translateX(0); } 15% { opacity: .25; transform: translateX(0); } 35% { opacity: 1; transform: translateX(1px); } 65% { opacity: .8; transform: translateX(2px); } 80% { opacity: .4; transform: translateX(3px); } }
+@keyframes satellite-signal-far { 0%,100% { opacity: .55; transform: translateX(0); } 20% { opacity: .25; transform: translateX(0); } 55% { opacity: 1; transform: translateX(2px); } 80% { opacity: .75; transform: translateX(4px); } }
 
 /* Progressive motion never conceals content without its script. */
 @keyframes archive-enter { from { opacity: 0; transform: translateY(.5rem); } to { opacity: 1; transform: translateY(0); } }
