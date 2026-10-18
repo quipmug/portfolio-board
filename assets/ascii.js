@@ -4,18 +4,19 @@
     const header = document.querySelector(".site-header");
     const flight = window.portfolioFlight;
     if (!shell || !header || !flight || !window.matchMedia || !window.fetch) return;
-    const desktop = window.matchMedia("(min-width: 1100px) and (hover: hover) and (pointer: fine)");
+    const desktop = window.matchMedia("(hover: hover) and (pointer: fine)");
     const touch = window.matchMedia("(any-pointer: coarse)");
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const url = new URL("./art/satellite.json?v=thrusters-10", document.currentScript.src);
+    const url = new URL("./art/satellite.json?v=compact-flight-11", document.currentScript.src);
     const obstacleSelector = ".site-header, .hero, .archive-navigation, .section-header, .post-item, .empty-state, .board-controls, .detail, .site-footer, dialog[open]";
     let art, node, craft, exhaust, request, events, resizeObserver, mutations, map, path, pointer, drag;
     let frame = 0, last = 0, signalTimer = 0, generation = 0, index = 1;
     let x = 0, y = 0, halfWidth = 0, halfHeight = 0, speed = 0, roll = 0, tossX = 0, tossY = 0;
-    let dirty = true, active = true, hovered = false, focused = false, placed = false, signature = "", scrollY = 0;
+    let dirty = true, active = true, focused = false, placed = false, signature = "", scrollY = 0;
     let suppressedUntil = 0, painted = "", paintedRoll = "";
     let jets = [], reaction = null, nextBurst = 0, strength = 0, normalX = 0, normalY = 0;
     let bank = 0, thrustX = 0, thrustY = 0;
+    let nextEncounter = 0, yieldAfter = 0;
     const variants = { content: "", edge: "" };
     const eligible = () => desktop.matches && !touch.matches;
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -31,6 +32,7 @@
     function burst(hit, now) {
       if (!jets.length) return;
       const edge = hit.kind === "edge";
+      const scale = halfWidth / 76.5;
       const glyphs = edge ? ["-", "=", "~", "--", "-~", "~-"] : [".", ":", "+", "*", ".:", ":.", ".."];
       const count = (edge ? 2 : 3) + Math.floor(Math.random() * 3);
       const letters = Array.from({ length: count }, () => glyphs[Math.floor(Math.random() * glyphs.length)]);
@@ -43,10 +45,10 @@
         jet.live = true;
         jet.start = now + Math.random() * (edge ? 65 : 40);
         jet.life = edge ? 330 + Math.random() * 140 : 180 + Math.random() * 110;
-        jet.x = halfWidth + dx * 17 + tx * spread;
-        jet.y = halfHeight + 16 + dy * 17 + ty * spread;
-        jet.vx = dx * (edge ? 17 : 26) + tx * (Math.random() - .5) * 12;
-        jet.vy = dy * (edge ? 17 : 26) + ty * (Math.random() - .5) * 12;
+        jet.x = halfWidth + (dx * 17 + tx * spread) * scale;
+        jet.y = halfHeight + (16 + dy * 17 + ty * spread) * scale;
+        jet.vx = (dx * (edge ? 17 : 26) + tx * (Math.random() - .5) * 12) * scale;
+        jet.vy = (dy * (edge ? 17 : 26) + ty * (Math.random() - .5) * 12) * scale;
         jet.angle = edge ? Math.atan2(dy, dx) * 180 / Math.PI : (Math.random() - .5) * 18;
         jet.opacity = (edge ? .6 : .75) + hit.strength * .2;
         jet.element.className = `ascii-exhaust-glyph ascii-exhaust-${hit.kind}`;
@@ -125,6 +127,7 @@
       frame = 0;
       last = 0;
       speed = tossX = tossY = 0;
+      nextEncounter = yieldAfter = 0;
       stopSignal();
       resetContact();
       cancelDrag();
@@ -145,6 +148,7 @@
       node.hidden = false;
       const width = document.documentElement.clientWidth, height = document.documentElement.clientHeight;
       const box = node.getBoundingClientRect();
+      const resized = halfWidth !== box.width / 2 || halfHeight !== box.height / 2;
       halfWidth = box.width / 2;
       halfHeight = box.height / 2;
       const rects = Array.from(document.querySelectorAll(obstacleSelector)).filter(element =>
@@ -170,7 +174,7 @@
       x = safe.x;
       y = safe.y;
       placed = true;
-      if (relocated) { speed = tossX = tossY = 0; resetContact(); }
+      if (relocated || resized) { speed = tossX = tossY = 0; resetContact(); }
       if (drag && pointer) { drag.x = x; drag.y = y; drag.startX = pointer.x; drag.startY = pointer.y; }
       if (path) {
         const rest = [position(), ...path.slice(index)];
@@ -180,11 +184,11 @@
       paint();
     }
 
-    function plan() {
-      const points = flight.plan(position(), map);
-      path = points?.length > 1 ? flight.smooth(points, map) : null;
+    function follow(points) {
+      const next = points?.length > 1 ? flight.smooth(points, map) : null;
+      if (!next || next.length < 2) return false;
+      path = next;
       index = 1;
-      if (!path || path.length < 2) { path = null; speed = 0; return false; }
       for (let i = 1; i < path.length - 1; i++) {
         const a = path[i - 1], b = path[i], c = path[i + 1];
         const angle = Math.abs(Math.atan2((b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x),
@@ -194,6 +198,42 @@
       }
       path[path.length - 1].cap = 0;
       return true;
+    }
+
+    function plan() {
+      if (follow(flight.plan(position(), map))) return true;
+      path = null;
+      speed = 0;
+      return false;
+    }
+
+    function skirtPointer(now) {
+      if (!pointer || !path || now < nextEncounter || now < yieldAfter) return;
+      const gap = distance(position(), pointer);
+      if (gap > halfWidth + 68) return;
+      let join = index, ahead = distance(position(), path[join]);
+      while (join + 1 < path.length && ahead < 110) {
+        ahead += distance(path[join], path[join + 1]);
+        join += 1;
+      }
+      const goal = path[join], length = distance(position(), goal);
+      const heading = path[index], headingLength = distance(position(), heading);
+      if (length < 55 || headingLength < .001) return;
+      const ux = (heading.x - x) / headingLength, uy = (heading.y - y) / headingLength;
+      if ((pointer.x - x) * ux + (pointer.y - y) * uy < -halfWidth * .35) return;
+      const cross = ux * (pointer.y - y) - uy * (pointer.x - x);
+      const side = Math.abs(cross) > 2 ? -Math.sign(cross) : (Math.random() < .5 ? -1 : 1);
+      nextEncounter = now + 1600;
+      const lead = { x: x + ux * 18, y: y + uy * 18 };
+      if (!flight.clear(position(), lead, map)) return;
+      for (const turn of [side, -side]) for (const offset of [48, 30, 18]) {
+        const lateral = offset * Math.min(1, halfWidth / 60);
+        const along = Math.min(65, length * .55);
+        const bend = { x: x + ux * along - uy * lateral * turn,
+          y: y + uy * along + ux * lateral * turn };
+        if (!flight.clear(lead, bend, map) || !flight.clear(bend, goal, map)) continue;
+        if (follow([position(), lead, bend, goal, ...path.slice(join + 1)])) { send(); return; }
+      }
     }
 
     function advance(amount) {
@@ -267,7 +307,7 @@
       const before = position();
       const proximity = pointer ? Math.hypot(Math.max(Math.abs(pointer.x - x) - halfWidth, 0),
         Math.max(Math.abs(pointer.y - y) - halfHeight, 0)) : Infinity;
-      const parked = hovered || focused;
+      const parked = focused;
       if (focused) tossX = tossY = 0;
       if (drag && pointer) {
         dragStep(now, dt);
@@ -296,7 +336,8 @@
         y = next.y;
       } else {
         if (!path && !parked) plan();
-        let targetSpeed = parked || !path ? 0 : 34 * (proximity < 100 ? .35 + .65 * proximity / 100 : 1);
+        if (!parked) skirtPointer(now);
+        let targetSpeed = parked || !path ? 0 : 34 * (proximity < 100 ? .65 + .35 * proximity / 100 : 1);
         if (path) {
           let ahead = distance(position(), path[index]);
           for (let i = index; i < path.length && ahead < 130; i++) {
@@ -334,7 +375,7 @@
       node?.remove();
       node = craft = exhaust = map = pointer = path = null;
       jets = [];
-      hovered = focused = placed = false;
+      focused = placed = false;
       dirty = true;
       signature = painted = paintedRoll = "";
     }
@@ -369,8 +410,7 @@
       document.body.append(node);
       events = new AbortController();
       const on = (target, type, handler, options = {}) => target.addEventListener(type, handler, { ...options, signal: events.signal });
-      on(node, "pointerenter", () => { hovered = true; send(); schedule(); });
-      on(node, "pointerleave", () => { hovered = false; schedule(); });
+      on(node, "pointerenter", () => { yieldAfter = performance.now() + 180; send(); schedule(); });
       on(node, "focus", () => { focused = node.matches(":focus-visible"); send(); schedule(); });
       on(node, "blur", () => { focused = false; schedule(); });
       on(node, "keydown", event => { if (!event.metaKey && !event.ctrlKey && !event.altKey) { focused = true; schedule(); } });
@@ -415,14 +455,13 @@
           }
         }
         cancelDrag();
-        hovered = Math.abs(pointer.x - x) <= halfWidth && Math.abs(pointer.y - y) <= halfHeight;
         if (moved) send();
         schedule();
       });
       on(document, "pointercancel", event => { if (event.pointerId === drag?.id) { cancelDrag(); path = null; schedule(); } });
       on(node, "lostpointercapture", () => { if (drag) { cancelDrag(); path = null; schedule(); } });
       on(node, "dragstart", event => event.preventDefault());
-      on(document, "pointerout", event => { if (!event.relatedTarget && !drag) { pointer = null; hovered = false; schedule(); } });
+      on(document, "pointerout", event => { if (!event.relatedTarget && !drag) { pointer = null; schedule(); } });
       on(window, "resize", reframe, { passive: true });
       on(document, "scroll", relayout, { passive: true, capture: true });
       on(document, "animationend", event => { if (!node.contains(event.target)) relayout(); });
@@ -469,7 +508,7 @@
     touch.addEventListener("change", sync);
     reduced.addEventListener("change", () => { pause(); relayout(); });
     document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); else relayout(); });
-    window.addEventListener("blur", () => { active = false; pointer = null; hovered = false; pause(); });
+    window.addEventListener("blur", () => { active = false; pointer = null; pause(); });
     window.addEventListener("focus", () => { active = true; last = 0; relayout(); });
     window.addEventListener("pagehide", remove);
     window.addEventListener("pageshow", () => { active = true; sync(); });
