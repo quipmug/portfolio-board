@@ -40,7 +40,6 @@
       const label = `Theme: ${mode}. Switch to ${nextMode}`;
       button.dataset.mode = mode;
       button.setAttribute("aria-label", label);
-      button.title = label;
       button.hidden = false;
     }
   }
