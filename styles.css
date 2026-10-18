@@ -448,8 +448,8 @@ html:not(.has-custom-cursor) :is(.fx-cursor,.fx-cursor-echo) { opacity: 0; visib
 }
 @media (max-width: 479px) and (pointer: coarse), (max-width: 479px) and (hover: none), (max-width: 479px) and (any-pointer: coarse) {
   .interests { display: grid; grid-template-columns: repeat(4,max-content); column-gap: .625rem; }
-  .interest-trading { grid-column: 2; }
-  .interest-programming { grid-column: 3 / span 2; }
+  .interest-trading { grid-column: 1; }
+  .interest-programming { grid-column: 2 / span 3; }
 }
 @media (max-height: 500px) { :root { --page-inset: 24px; } }
 @media (pointer: coarse), (hover: none), (forced-colors: active) { .fx-cursor, .fx-cursor-echo { display: none; } .contact-link, .switcher button { --magnet-x: 0px !important; --magnet-y: 0px !important; } .post-list::before { content: none; } }
