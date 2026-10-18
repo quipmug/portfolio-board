@@ -110,7 +110,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offs
 .tab-top { font-size: 1rem; line-height: 1.5; }
 .tab-top > span { position: relative; }
 .switcher button[aria-selected="true"] .tab-top > span::after { content: ""; position: absolute; width: 6px; height: 6px; left: calc(50% - 3px); top: calc(100% + .4rem); border-radius: 50%; background: var(--ink); pointer-events: none; }
-.switcher[data-motion="ready"] .tab-top > span::after { content: none; }
+.switcher[data-motion="ready"] button[aria-selected="true"] .tab-top > span::after { content: none; }
 .tab-indicator { position: absolute; top: 0; left: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--ink); pointer-events: none; transition: transform 280ms var(--motion-ease); }
 .archive-content, .content, .panel { min-width: 0; }
 .content { position: relative; }
@@ -199,6 +199,8 @@ body:has(dialog[open]), html:has(dialog[open]) { overflow: hidden; overscroll-be
 dialog[open] { animation: dialog-enter 250ms var(--motion-ease) both; }
 dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(.25rem); animation: archive-fade-in 200ms ease both; }
 dialog form, .about-fields { min-width: 0; }
+dialog { scroll-padding-block: 1rem; }
+dialog input, dialog textarea, dialog select { scroll-margin-block: .75rem; }
 .dialog-header { margin-bottom: 1rem; }
 .eyebrow { margin: 0 0 .5rem; }
 .dialog-header h2 { margin: 0; font-size: 1.333rem; font-weight: 500; letter-spacing: -.01em; line-height: 1.3; }
@@ -245,7 +247,8 @@ dialog form[aria-busy="true"] .primary::before { content: ""; width: 1rem; heigh
 .interest-item { display: inline-flex; align-items: center; min-width: 0; }
 .interest-trigger { display: inline-flex; align-items: center; justify-content: flex-start; gap: .4rem; min-height: 28px; max-width: 100%; padding: 0; border: 0; border-radius: .25rem; color: inherit; background: transparent; font: inherit; white-space: nowrap; }
 .interest-trigger:disabled { cursor: default; opacity: 1; }
-.interest-trigger:enabled:is(:hover,:focus-visible) { color: var(--ink); }
+.interest-trigger:enabled:is(:focus-visible,:active,.is-playing) { color: var(--ink); }
+@media (hover: hover) and (pointer: fine) { .interest-trigger:enabled:hover { color: var(--ink); } }
 .interest-trigger:focus-visible { outline-offset: 2px; }
 .interest-icon { display: inline-block; flex: none; width: 1.167em; height: 1.167em; width: round(nearest,1.167em,1px); height: round(nearest,1.167em,1px); background: currentColor; -webkit-mask: var(--interest-icon) center / contain no-repeat; mask: var(--interest-icon) center / contain no-repeat; opacity: .8; }
 .interest-trigger.is-playing .interest-icon { animation: var(--interest-motion) var(--interest-duration) cubic-bezier(.4,0,.2,1); }
@@ -377,17 +380,50 @@ html:not(.has-custom-cursor) :is(.fx-cursor,.fx-cursor-echo) { opacity: 0; visib
   .role-connector { flex-basis: 32px; width: 32px; min-height: 32px; margin: 0 -.125rem; }
   .role-connector-fallback { width: 32px; height: 32px; margin: 0 -.125rem; }
 }
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .switcher { gap: 1.5rem; }
   .post-item { column-gap: .5rem; }
   .post-meta { max-width: 8rem; white-space: normal; text-align: right; }
   .owner-label { flex-basis: 100%; }
-  dialog, #auth-dialog, #confirm-dialog { position: fixed; inset: auto 0 0; width: 100%; max-width: 100%; max-height: 92vh; max-height: 92dvh; margin: 0; padding: 1.25rem calc(1.25rem + env(safe-area-inset-right,0px)) calc(1.25rem + env(safe-area-inset-bottom,0px)) calc(1.25rem + env(safe-area-inset-left,0px)); border: 0; border-top: 1px solid var(--line); border-radius: 1rem 1rem 0 0; }
 }
-@media (max-width: 767px), (pointer: coarse), (hover: none) { input, textarea, select, dialog input, dialog textarea, dialog select, .search-region input { font-size: 16px; } }
-@media (pointer: coarse), (hover: none) { .post-title { min-height: 44px; } }
-@media (pointer: coarse), (hover: none) { .interest-trigger, .interest-label { min-height: 44px; } }
-@media (pointer: coarse) and (max-height: 500px) { .site-shell { padding-top: 1.714rem; } }
+@media (max-width: 768px), (pointer: coarse), (hover: none), (any-pointer: coarse) {
+  input, textarea, select, dialog input, dialog textarea, dialog select, .search-region input { font-size: 16px; }
+  dialog, #auth-dialog, #confirm-dialog { position: fixed; top: var(--dialog-viewport-top,0px); bottom: var(--dialog-viewport-bottom,0px); width: min(42rem,calc(100% - 2.5rem)); max-height: 92vh; max-height: min(92dvh,calc(var(--dialog-viewport-height,100dvh) - 1rem)); }
+  dialog textarea { min-height: clamp(8rem,calc(var(--dialog-viewport-height,100dvh) / 3),14rem); }
+}
+@media (max-width: 768px), (pointer: coarse) and (max-height: 600px), (hover: none) and (max-height: 600px), (any-pointer: coarse) and (max-height: 600px) {
+  dialog, #auth-dialog, #confirm-dialog { top: auto; right: 0; bottom: var(--dialog-viewport-bottom,0px); left: 0; width: 100%; max-width: 100%; margin: 0; padding: 1rem calc(1rem + env(safe-area-inset-right,0px)) calc(1rem + env(safe-area-inset-bottom,0px)) calc(1rem + env(safe-area-inset-left,0px)); border: 0; border-top: 1px solid var(--line); border-radius: 1rem 1rem 0 0; }
+}
+/* Touch layouts keep small typography legible and hit areas independent of glyph size. */
+@media (pointer: coarse), (hover: none), (any-pointer: coarse) {
+  :root { font-size: 13px; --text-identity: max(12px,.9rem); }
+  html { scrollbar-gutter: auto; }
+  .site-shell { padding-inline: calc(20px + env(safe-area-inset-left,0px)) calc(20px + env(safe-area-inset-right,0px)); }
+  .post-title, #contact-icons .contact-link { min-height: 44px; }
+  #toggle-filter { min-height: 44px; }
+  #contact-icons .contact-link { min-width: 44px; }
+  .switcher { gap: 1.125rem; }
+  .switcher button { min-width: 44px; min-height: 44px; }
+  .interest-trigger, .interest-label { min-height: 44px; }
+  .interest-trigger { min-width: 44px; gap: .45rem; }
+  .interests { column-gap: .5rem; }
+  .interest-icon { width: 16px; height: 16px; }
+  .theme-toggle::before { width: 16px; height: 16px; }
+  .role-connector-mark { width: 20px; height: 20px; }
+  .signature-role { min-height: 44px; }
+  .role-connector { flex-basis: 44px; width: 44px; min-height: 44px; margin: 0 -.25rem; }
+  .role-connector-fallback { width: 44px; height: 44px; margin: 0 -.25rem; -webkit-mask-size: 20px; mask-size: 20px; }
+  .post-title::after { width: 15px; height: 15px; top: calc(50% - 7.5px); opacity: .5; transform: none; }
+  .interest-trigger, .role-connector, .theme-toggle, .brand { touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .interest-trigger:active, .role-connector:active, .theme-toggle:active { transform: none; }
+  .footer-mascot { touch-action: pan-y pinch-zoom; }
+}
+@media (max-width: 479px) and (pointer: coarse), (max-width: 479px) and (hover: none), (max-width: 479px) and (any-pointer: coarse) {
+  .interests { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); column-gap: .375rem; }
+  .interest-trading { grid-column: 1 / span 2; }
+  .interest-programming { grid-column: 3 / span 2; }
+}
+@media (pointer: coarse) and (max-height: 500px), (hover: none) and (max-height: 500px), (any-pointer: coarse) and (max-height: 500px) { .site-shell { padding-top: 1rem; } }
 @media (pointer: coarse), (hover: none), (forced-colors: active) { .fx-cursor, .fx-cursor-echo { display: none; } .contact-link, .switcher button { --magnet-x: 0px !important; --magnet-y: 0px !important; } .post-list::before { content: none; } }
 @media (forced-colors: active) {
   .theme-toggle::before, .role-connector-mark, .role-connector-fallback, .interest-icon, .footer-mascot > span, .post-title::after, .owner-access::before, .back::before, dialog .error::before { forced-color-adjust: none; background-color: currentColor; }
