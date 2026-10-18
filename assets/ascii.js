@@ -7,17 +7,89 @@
     const desktop = window.matchMedia("(min-width: 1100px) and (hover: hover) and (pointer: fine)");
     const touch = window.matchMedia("(any-pointer: coarse)");
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const url = new URL("./art/satellite.json?v=freeflight-9", document.currentScript.src);
+    const url = new URL("./art/satellite.json?v=thrusters-10", document.currentScript.src);
     const obstacleSelector = ".site-header, .hero, .archive-navigation, .section-header, .post-item, .empty-state, .board-controls, .detail, .site-footer, dialog[open]";
-    let art, node, craft, request, events, resizeObserver, mutations, map, path, pointer, drag;
+    let art, node, craft, exhaust, request, events, resizeObserver, mutations, map, path, pointer, drag;
     let frame = 0, last = 0, signalTimer = 0, generation = 0, index = 1;
     let x = 0, y = 0, halfWidth = 0, halfHeight = 0, speed = 0, roll = 0, tossX = 0, tossY = 0;
     let dirty = true, active = true, hovered = false, focused = false, placed = false, signature = "", scrollY = 0;
     let suppressedUntil = 0, painted = "", paintedRoll = "";
+    let jets = [], reaction = null, nextBurst = 0, strength = 0, normalX = 0, normalY = 0;
+    let bank = 0, thrustX = 0, thrustY = 0;
+    const variants = { content: "", edge: "" };
     const eligible = () => desktop.matches && !touch.matches;
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
     const position = () => ({ x, y });
     const distance = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
+
+    function resetContact() {
+      reaction = null;
+      nextBurst = strength = normalX = normalY = bank = thrustX = thrustY = 0;
+      jets.forEach(jet => { jet.live = false; jet.element.style.opacity = "0"; });
+    }
+
+    function burst(hit, now) {
+      if (!jets.length) return;
+      const edge = hit.kind === "edge";
+      const glyphs = edge ? ["-", "=", "~", "--", "-~", "~-"] : [".", ":", "+", "*", ".:", ":.", ".."];
+      const count = (edge ? 2 : 3) + Math.floor(Math.random() * 3);
+      const letters = Array.from({ length: count }, () => glyphs[Math.floor(Math.random() * glyphs.length)]);
+      if (letters.join("|") === variants[hit.kind]) letters[0] = glyphs[(glyphs.indexOf(letters[0]) + 1) % glyphs.length];
+      variants[hit.kind] = letters.join("|");
+      const dx = -hit.normal.x, dy = -hit.normal.y, tx = -dy, ty = dx;
+      letters.forEach(glyph => {
+        const jet = jets.find(value => !value.live) || jets.reduce((a, b) => a.start < b.start ? a : b);
+        const spread = (Math.random() - .5) * (edge ? 18 : 10);
+        jet.live = true;
+        jet.start = now + Math.random() * (edge ? 65 : 40);
+        jet.life = edge ? 330 + Math.random() * 140 : 180 + Math.random() * 110;
+        jet.x = halfWidth + dx * 17 + tx * spread;
+        jet.y = halfHeight + 16 + dy * 17 + ty * spread;
+        jet.vx = dx * (edge ? 17 : 26) + tx * (Math.random() - .5) * 12;
+        jet.vy = dy * (edge ? 17 : 26) + ty * (Math.random() - .5) * 12;
+        jet.angle = edge ? Math.atan2(dy, dx) * 180 / Math.PI : (Math.random() - .5) * 18;
+        jet.opacity = (edge ? .6 : .75) + hit.strength * .2;
+        jet.element.className = `ascii-exhaust-glyph ascii-exhaust-${hit.kind}`;
+        jet.element.textContent = glyph;
+        jet.element.style.opacity = "0";
+      });
+      nextBurst = now + (edge ? 410 + Math.random() * 180 : 210 + Math.random() * 140);
+    }
+
+    function react(hit, now) {
+      if (!hit || reduced.matches || !exhaust) return;
+      reaction = { ...hit, until: now + 140 };
+      if (hit.strength > .04 && now >= nextBurst) burst(hit, now);
+    }
+
+    function updateContact(now, dt) {
+      const live = reaction && now <= reaction.until;
+      const target = live ? reaction.strength : 0;
+      strength += (target - strength) * (1 - Math.exp(-dt * (live ? 15 : 11)));
+      if (!live && strength < .003) strength = 0;
+      if (live) {
+        const blend = 1 - Math.exp(-dt * 14);
+        normalX += (reaction.normal.x - normalX) * blend;
+        normalY += (reaction.normal.y - normalY) * blend;
+      }
+      const edge = reaction?.kind === "edge";
+      const tilt = normalX * (edge ? 6 : 4) + normalY * (edge ? 2 : 1);
+      bank = tilt * strength;
+      thrustX = normalX * strength * 1.8;
+      thrustY = normalY * strength * 1.8;
+      let alive = strength > .003;
+      jets.forEach(jet => {
+        if (!jet.live) return;
+        const age = now - jet.start, progress = age / jet.life;
+        if (progress >= 1) { jet.live = false; jet.element.style.opacity = "0"; return; }
+        alive = true;
+        if (age < 0) return;
+        const seconds = age / 1000;
+        jet.element.style.transform = `translate3d(${jet.x + jet.vx * seconds}px,${jet.y + jet.vy * seconds}px,0) rotate(${jet.angle}deg)`;
+        jet.element.style.opacity = String(Math.sin(Math.PI * progress) ** .65 * jet.opacity);
+      });
+      return alive;
+    }
 
     function stopSignal() {
       window.clearTimeout(signalTimer);
@@ -54,13 +126,15 @@
       last = 0;
       speed = tossX = tossY = 0;
       stopSignal();
+      resetContact();
       cancelDrag();
+      paint();
     }
 
     function paint() {
       if (!node || !craft || !map) return;
       const transform = `translate3d(${x - halfWidth}px,${y - halfHeight}px,0)`;
-      const angle = `rotate(${roll}deg)`;
+      const angle = `translate3d(${thrustX}px,${thrustY}px,0) rotate(${clamp(roll + bank, -9, 9)}deg)`;
       if (painted !== transform) { node.style.transform = transform; painted = transform; }
       if (paintedRoll !== angle) { craft.style.transform = angle; paintedRoll = angle; }
     }
@@ -96,7 +170,7 @@
       x = safe.x;
       y = safe.y;
       placed = true;
-      if (relocated) { speed = tossX = tossY = 0; }
+      if (relocated) { speed = tossX = tossY = 0; resetContact(); }
       if (drag && pointer) { drag.x = x; drag.y = y; drag.startX = pointer.x; drag.startY = pointer.y; }
       if (path) {
         const rest = [position(), ...path.slice(index)];
@@ -154,6 +228,30 @@
       return candidates.sort((a, b) => distance(a, target) - distance(b, target))[0] || current;
     }
 
+    function dragStep(now, dt) {
+      if (!drag || !pointer || !map) return;
+      const before = position();
+      const wanted = { x: drag.x + pointer.x - drag.startX, y: drag.y + pointer.y - drag.startY };
+      const target = slide(wanted);
+      const blocked = distance(target, wanted) > .5;
+      const hit = flight.contact(before, { x: wanted.x - x, y: wanted.y - y }, map, 34)
+        || (blocked ? flight.contact(target, { x: wanted.x - target.x, y: wanted.y - target.y }, map, 34) : null);
+      react(hit, now);
+      const dx = target.x - x, dy = target.y - y;
+      const along = 1 - Math.exp(-dt * 40), across = 1 - Math.exp(-dt * (blocked || hit ? 14 : 40));
+      const normal = hit?.normal || { x: 0, y: 0 };
+      const push = dx * normal.x + dy * normal.y;
+      const next = slide({ x: x + dx * along + normal.x * push * (across - along),
+        y: y + dy * along + normal.y * push * (across - along) });
+      x = next.x;
+      y = next.y;
+      if (dt > 0 && distance(before, next) > .01) {
+        drag.vx = clamp((x - before.x) / dt, -120, 120);
+        drag.vy = clamp((y - before.y) / dt, -120, 120);
+        drag.changed = now;
+      }
+    }
+
     function schedule() {
       if (node && !frame && active && !document.hidden && (dirty || (!node.hidden && !reduced.matches))) frame = window.requestAnimationFrame(move);
     }
@@ -172,18 +270,28 @@
       const parked = hovered || focused;
       if (focused) tossX = tossY = 0;
       if (drag && pointer) {
-        const next = slide({ x: drag.x + pointer.x - drag.startX, y: drag.y + pointer.y - drag.startY });
-        x = next.x;
-        y = next.y;
-        if (dt > 0 && distance(before, next) > .01) {
-          drag.vx = clamp((x - before.x) / dt, -120, 120);
-          drag.vy = clamp((y - before.y) / dt, -120, 120);
-          drag.changed = now;
-        }
+        dragStep(now, dt);
       } else if (!focused && Math.hypot(tossX, tossY) > 2) {
+        let hit = flight.contact(position(), { x: tossX, y: tossY }, map, 34);
+        react(hit, now);
+        if (hit) {
+          const incoming = Math.min(0, tossX * hit.normal.x + tossY * hit.normal.y);
+          const brake = 1 - Math.exp(-dt * (hit.kind === "edge" ? 12 : 20) * hit.strength);
+          tossX -= hit.normal.x * incoming * brake;
+          tossY -= hit.normal.y * incoming * brake;
+        }
         const wanted = { x: x + tossX * dt, y: y + tossY * dt }, next = slide(wanted);
-        if (distance(next, wanted) > .1) tossX = tossY = 0;
-        else { tossX *= Math.exp(-dt * 5); tossY *= Math.exp(-dt * 5); }
+        if (distance(next, wanted) > .1) {
+          hit ||= flight.contact(next, { x: wanted.x - next.x, y: wanted.y - next.y }, map, 34);
+          if (hit) {
+            react(hit, now);
+            const incoming = Math.min(0, tossX * hit.normal.x + tossY * hit.normal.y);
+            tossX -= hit.normal.x * incoming;
+            tossY -= hit.normal.y * incoming;
+          } else tossX = tossY = 0;
+        }
+        tossX *= Math.exp(-dt * 5);
+        tossY *= Math.exp(-dt * 5);
         x = next.x;
         y = next.y;
       } else {
@@ -197,13 +305,17 @@
           }
         }
         speed += clamp(targetSpeed - speed, -85 * dt, 34 * dt);
-        if (path && speed > .001) advance(speed * dt);
+        if (path && speed > .001) {
+          if (speed > 3) react(flight.contact(position(), { x: path[index].x - x, y: path[index].y - y }, map, 28), now);
+          advance(speed * dt);
+        }
       }
       const vx = dt > 0 ? (x - before.x) / dt : 0;
       const targetRoll = pointer && proximity < 150 ? clamp((pointer.x - x) / (halfWidth * 2) * 6, -5, 5) : clamp(vx * .1, -4, 4);
       roll += (targetRoll - roll) * (1 - Math.exp(-dt * 8));
+      const contactAlive = updateContact(now, dt);
       paint();
-      if (drag || (!parked && path) || Math.hypot(tossX, tossY) > 2 || speed > .01 || Math.abs(targetRoll - roll) > .005) schedule();
+      if (contactAlive || drag || (!parked && path) || Math.hypot(tossX, tossY) > 2 || speed > .01 || Math.abs(targetRoll - roll) > .005) schedule();
       else last = 0;
     }
 
@@ -220,7 +332,8 @@
       mutations?.disconnect();
       if (node === document.activeElement && !document.hidden) header.focus({ preventScroll: true });
       node?.remove();
-      node = craft = map = pointer = path = null;
+      node = craft = exhaust = map = pointer = path = null;
+      jets = [];
       hovered = focused = placed = false;
       dirty = true;
       signature = painted = paintedRoll = "";
@@ -243,6 +356,16 @@
         craft.append(layer);
       }
       node.append(craft);
+      exhaust = document.createElement("span");
+      exhaust.className = "ascii-exhaust";
+      exhaust.setAttribute("aria-hidden", "true");
+      jets = Array.from({ length: 12 }, () => {
+        const element = document.createElement("span");
+        element.className = "ascii-exhaust-glyph";
+        exhaust.append(element);
+        return { element, live: false, start: 0 };
+      });
+      node.append(exhaust);
       document.body.append(node);
       events = new AbortController();
       const on = (target, type, handler, options = {}) => target.addEventListener(type, handler, { ...options, signal: events.signal });
@@ -277,16 +400,19 @@
       on(document, "pointerup", event => {
         if (event.pointerId !== drag?.id) return;
         pointer = { x: event.clientX, y: event.clientY };
-        if (map) {
-          const next = slide({ x: drag.x + pointer.x - drag.startX, y: drag.y + pointer.y - drag.startY });
-          x = next.x;
-          y = next.y;
-          paint();
-        }
+        const now = performance.now();
+        dragStep(now, clamp((now - last) / 1000 || 1 / 60, 1 / 240, .025));
+        paint();
         const moved = drag.moved;
         if (moved) {
           suppressedUntil = performance.now() + 350;
-          if (performance.now() - drag.changed < 100) { tossX = drag.vx * .45; tossY = drag.vy * .45; }
+          if (now - drag.changed < 100) { tossX = drag.vx * .45; tossY = drag.vy * .45; }
+          if (reaction && now < reaction.until && reaction.strength > .1) {
+            const incoming = Math.min(0, tossX * reaction.normal.x + tossY * reaction.normal.y);
+            const retreat = reaction.kind === "edge" ? 8 : 14;
+            tossX += reaction.normal.x * (retreat * reaction.strength - incoming);
+            tossY += reaction.normal.y * (retreat * reaction.strength - incoming);
+          }
         }
         cancelDrag();
         hovered = Math.abs(pointer.x - x) <= halfWidth && Math.abs(pointer.y - y) <= halfHeight;

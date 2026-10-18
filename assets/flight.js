@@ -90,6 +90,53 @@
     return true;
   }
 
+  function contact(origin, motion, map, reach = 32) {
+    if (!safe(origin, map) || !point(motion) || !finite(reach) || reach <= 0) return null;
+    const length = Math.hypot(motion.x, motion.y);
+    if (length < EPSILON) return null;
+    let best = null, score = Infinity;
+    function consider(kind, gap, nx, ny) {
+      const size = Math.hypot(nx, ny);
+      if (gap < -EPSILON || gap > reach || size < EPSILON) return;
+      nx /= size; ny /= size;
+      const approach = -(motion.x * nx + motion.y * ny) / length;
+      if (approach < .015) return;
+      const rank = gap / Math.max(.15, approach);
+      if (rank >= score) return;
+      score = rank;
+      best = { kind, distance: Math.max(0, gap), normal: { x: nx, y: ny },
+        strength: Math.max(0, 1 - gap / reach) * Math.sqrt(approach) };
+    }
+    const b = map.bounds;
+    const edges = [[origin.x - b.left, 1, 0], [b.right - origin.x, -1, 0],
+      [origin.y - b.top, 0, 1], [b.bottom - origin.y, 0, -1]];
+    const approaching = edges.filter(([gap, nx, ny]) => gap <= reach && motion.x * nx + motion.y * ny < 0);
+    if (approaching.length) {
+      const nearest = Math.min(...approaching.map(edge => edge[0]));
+      let nx = 0, ny = 0;
+      approaching.forEach(([gap, ax, ay]) => { const weight = Math.max(.001, 1 - gap / reach); nx += ax * weight; ny += ay * weight; });
+      consider("edge", nearest, nx, ny);
+    }
+    for (const rect of map.obstacles) {
+      const dx = origin.x - clamp(origin.x, rect.left, rect.right);
+      const dy = origin.y - clamp(origin.y, rect.top, rect.bottom);
+      const gap = Math.hypot(dx, dy);
+      if (gap > reach) continue;
+      if (gap > EPSILON) consider("content", gap, dx, dy);
+      else {
+        const sides = [[Math.abs(origin.x - rect.left), -1, 0], [Math.abs(origin.x - rect.right), 1, 0],
+          [Math.abs(origin.y - rect.top), 0, -1], [Math.abs(origin.y - rect.bottom), 0, 1]];
+        let nx = 0, ny = 0;
+        sides.filter(side => side[0] < .001).forEach(([, ax, ay]) => {
+          const weight = Math.max(0, -(motion.x * ax + motion.y * ay) / length);
+          nx += ax * weight; ny += ay * weight;
+        });
+        consider("content", 0, nx, ny);
+      }
+    }
+    return best;
+  }
+
   function nearest(value, map) {
     if (!point(value) || !valid(map)) return null;
     const b = map.bounds;
@@ -240,5 +287,5 @@
     return result;
   }
 
-  return { createMap, safe, clear, nearest, plan, smooth };
+  return { createMap, safe, clear, contact, nearest, plan, smooth };
 });

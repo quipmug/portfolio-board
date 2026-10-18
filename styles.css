@@ -320,6 +320,8 @@ html:not([data-owner-access="visible"]) .owner-access--discreet { display: none 
   .ascii-satellite { position: fixed; z-index: 2; top: 0; left: 0; display: grid; place-items: center; width: 12rem; height: 12rem; margin: 0; padding: 0; border: 0; color: var(--muted); background: transparent; isolation: isolate; cursor: grab; touch-action: none; transition: opacity 100ms; }
   .ascii-craft { display: grid; place-items: center; pointer-events: none; }
   .ascii-craft > pre { grid-area: 1 / 1; margin: 0; padding: 0; font: 400 .667rem/1.05 ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace; letter-spacing: 0; white-space: pre; overflow-wrap: normal; pointer-events: none; user-select: none; }
+  .ascii-exhaust { position: absolute; inset: 0; pointer-events: none; user-select: none; }
+  .ascii-exhaust-glyph { position: absolute; top: 0; left: 0; opacity: 0; font: 400 .667rem/1 ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace; white-space: pre; pointer-events: none; transform-origin: center; }
   .ascii-signal { opacity: .55; }
   .ascii-satellite:is(:hover,:focus-visible) { color: var(--ink); }
   .ascii-satellite:active { opacity: .8; }
@@ -450,6 +452,7 @@ html:not(.has-custom-cursor) :is(.fx-cursor,.fx-cursor-echo) { opacity: 0; visib
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
   .fx-cursor, .fx-cursor-echo, .post-list::before { display: none; }
+  .ascii-exhaust { display: none; }
   .contact-link, .switcher button { --magnet-x: 0px !important; --magnet-y: 0px !important; }
   .role-connector-mark { transform: none !important; }
   html.js-reveal :is(.post-item,.detail .body > *,.site-footer).reveal-pending { opacity: 1; transform: none; }
