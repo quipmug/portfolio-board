@@ -11,7 +11,9 @@
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
     const sceneLabels = { morning: "A ghost waking up", day: "A cheerful ghost", evening: "A ghost relaxing", night: "A ghost sleeping" };
     let suspended = document.hidden;
-    let minuteTimer = 0;
+    let clockTimer = 0;
+    let renderedMinute = null;
+    let renderedSearch = null;
     let greetingTimer = 0;
     let greetingRun = 0;
     let pressTimer = 0;
@@ -72,27 +74,37 @@
         || Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 8;
     }
 
-    function updateTime() {
-      window.clearTimeout(minuteTimer);
-      minuteTimer = 0;
+    function updateTime(force = false) {
+      window.clearTimeout(clockTimer);
+      clockTimer = 0;
       if (suspended || document.hidden) return;
       try {
+        const now = new Date();
+        const minute = Math.floor(now.getTime() / 60000);
+        const search = window.location.search;
+        if (!force && minute === renderedMinute && search === renderedSearch) return;
         const time = window.portfolioTime;
         if (time?.getSnapshot && time.parseOverride) {
-          const snapshot = time.getSnapshot(new Date(), time.parseOverride(window.location.search));
-          if (root.dataset.mascotScene !== snapshot.scene) clearMotion();
-          root.dataset.mascotScene = snapshot.scene;
-          mascot?.setAttribute("aria-label", sceneLabels[snapshot.scene] || "A small ghost");
-          if (clock) {
-            clock.textContent = snapshot.text;
-            clock.dateTime = snapshot.datetime;
-            clock.hidden = false;
+          const snapshot = time.getSnapshot(now, time.parseOverride(search));
+          if (root.dataset.mascotScene !== snapshot.scene) {
+            clearMotion();
+            root.dataset.mascotScene = snapshot.scene;
           }
+          const label = sceneLabels[snapshot.scene] || "A small ghost";
+          if (mascot && mascot.getAttribute("aria-label") !== label) mascot.setAttribute("aria-label", label);
+          if (clock) {
+            if (clock.textContent !== snapshot.text) clock.textContent = snapshot.text;
+            if (clock.dateTime !== snapshot.datetime) clock.dateTime = snapshot.datetime;
+            if (clock.hidden) clock.hidden = false;
+          }
+          renderedMinute = minute;
+          renderedSearch = search;
         }
       } catch {
         // A transient enhancement failure must not stop future clock updates.
       } finally {
-        if (!suspended && !document.hidden) minuteTimer = window.setTimeout(updateTime, 60000 - (Date.now() % 60000) + 25);
+        // A short wall-clock check also catches clock changes and wakeups without focus events.
+        if (!suspended && !document.hidden) clockTimer = window.setTimeout(updateTime, 1000 - (Date.now() % 1000) + 25);
       }
     }
 
@@ -111,14 +123,14 @@
       suspended = document.hidden;
       cancelGesture();
       syncOwnerAccess();
-      updateTime();
+      updateTime(true);
       clearMotion();
     }
 
     function pause() {
       suspended = true;
-      window.clearTimeout(minuteTimer);
-      minuteTimer = 0;
+      window.clearTimeout(clockTimer);
+      clockTimer = 0;
       cancelGesture();
       clearMotion();
     }
@@ -190,6 +202,14 @@
       observer.observe(controls, { attributes: true, attributeFilter: ["hidden"] });
     }
     document.addEventListener("visibilitychange", guard(() => { if (document.hidden) pause(); else resume(); }));
+    document.addEventListener("freeze", guard(pause));
+    document.addEventListener("resume", guard(resume));
+    const refreshOnInput = guard(() => {
+      if (suspended && !document.hidden) resume();
+      else updateTime();
+    });
+    document.addEventListener("pointerdown", refreshOnInput, { capture: true, passive: true });
+    document.addEventListener("keydown", refreshOnInput, true);
     window.addEventListener("pagehide", guard(pause));
     window.addEventListener("pageshow", guard(resume));
     window.addEventListener("focus", guard(resume));
