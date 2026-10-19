@@ -436,7 +436,10 @@
 
     try {
       mutations = new MutationObserver(guard(records => {
-        if (records.some(record => !record.target.parentElement?.closest(".panel-ghost"))) queueScan();
+        if (records.some(record => {
+          const target = record.target instanceof Element ? record.target : record.target.parentElement;
+          return !target?.closest(".panel-ghost, .ascii-satellite, .fx-cursor, .fx-cursor-echo");
+        })) queueScan();
       }));
       const observe = () => mutations.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "open", "aria-hidden", "aria-modal", "role", "disabled", "aria-disabled", "inert", "href", "contenteditable"] });
       observe();

@@ -78,6 +78,7 @@
       startEntryFade();
       return result;
     };
+    pending.apply = apply;
 
     try {
       const current = document.startViewTransition(apply);
@@ -108,8 +109,14 @@
     clearPanelFade();
   }
 
-  document.addEventListener("pointerdown", stopMotion, true);
-  document.addEventListener("keydown", stopMotion, true);
+  function finishPendingMotion() {
+    // Interrupt the animation without discarding the requested navigation.
+    try { pendingUpdate?.apply(); }
+    finally { stopMotion(); }
+  }
+
+  document.addEventListener("pointerdown", finishPendingMotion, true);
+  document.addEventListener("keydown", finishPendingMotion, true);
   const stopPageMotion = () => {
     cancelSettlement();
     stopMotion();
@@ -128,9 +135,12 @@
     if (!applying && pendingUpdate) stopMotion();
   };
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) stopPageMotion();
+    if (document.hidden) {
+      finishPendingMotion();
+      stopPageMotion();
+    }
   });
-  reducedMotion.addEventListener("change", stopMotion);
+  reducedMotion.addEventListener("change", finishPendingMotion);
   const finishEntrance = event => {
     if (event.animationName === "archive-enter" && event.target instanceof Element && !event.target.closest(".panel-ghost")) {
       event.target.classList.add("motion-entered");
