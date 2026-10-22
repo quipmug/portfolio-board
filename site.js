@@ -42,6 +42,8 @@ const contactPlatforms = ["email", "cv", "linkedin", "github", "telegram", "disc
 const dateFormatter = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" });
 const listSignatures = new Map();
 const summaryCache = new WeakMap();
+let detailBodySnapshot = null;
+let contactSignature = null;
 
 let client = null;
 let posts = [];
@@ -195,11 +197,15 @@ function appendFormattedText(element, value) {
 
 function renderPostBody(value) {
   const body = document.querySelector("#detail-body");
+  // Preserve selection and code-block scroll when background reads return the same entry.
+  if (detailBodySnapshot?.id === openPostId && detailBodySnapshot.value === value && body.firstChild) return;
+  detailBodySnapshot = null;
   body.replaceChildren();
   if (!window.postFormat) {
     const paragraph = document.createElement("p");
     paragraph.textContent = value;
     body.append(paragraph);
+    detailBodySnapshot = { id: openPostId, value };
     return;
   }
   window.postFormat.parsePostText(value).forEach(function (block) {
@@ -225,6 +231,7 @@ function renderPostBody(value) {
     appendFormattedText(element, block.text);
     body.append(element);
   });
+  detailBodySnapshot = { id: openPostId, value };
 }
 
 function safeContactLink(platform, raw) {
@@ -250,6 +257,9 @@ function safeContactLink(platform, raw) {
 }
 
 function renderContactLinks() {
+  const signature = JSON.stringify(contactPlatforms.map(platform => [platform, safeContactLink(platform, contactLinks.get(platform))]));
+  // Unchanged contacts retain their native focus and any in-progress activation.
+  if (signature === contactSignature) return;
   contactIcons.replaceChildren();
   contactPlatforms.forEach(function (platform) {
     const href = safeContactLink(platform, contactLinks.get(platform));
@@ -269,6 +279,7 @@ function renderContactLinks() {
     contactIcons.append(anchor);
   });
   contacts.hidden = !contactIcons.childElementCount;
+  contactSignature = signature;
 }
 
 async function refreshContactLinks() {
@@ -554,6 +565,7 @@ function showPost(id, resetScroll = true, moveFocus = true) {
 
 function showMissingPost(moveFocus = true) {
   resetCopyStatus();
+  detailBodySnapshot = null;
   document.title = "post unavailable · " + displaySiteTitle();
   shareAction.hidden = true;
   const alreadyShown = !detail.hidden && document.querySelector("#detail-title").textContent === "this post isn't available.";
@@ -686,6 +698,7 @@ function clearPrivateView() {
   ++linksRevision;
   ++profileRevision;
   canPublish = false;
+  detailBodySnapshot = null;
   boardControls.hidden = true;
   posts = [];
   listSignatures.clear();

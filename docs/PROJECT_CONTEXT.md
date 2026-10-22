@@ -35,6 +35,8 @@ Owner sign-in is hidden from ordinary visitor display, accessibility and keyboar
 
 Public reads, private drafts, all five dialogs and existing write/conflict guards remain intact. Production data/settings are not changed for visual work. Never ship a service-role or secret key. Sign-out ends only the current browser session. Owner writes use RLS, version comparisons and the existing save_external_links conflict check.
 
+Unchanged background reads retain entry-body nodes and contact anchors, preserving text selection, code-block scroll and keyboard focus. Changed entry bodies still render immediately; missing entries and private-view cleanup invalidate the body snapshot so old content cannot survive replacement or sign-out. The 404 theme control follows the main page without a stale native tooltip.
+
 SDK/transport/UI waits are bounded. New-entry retries reuse a UUID after uncertain writes. Unsaved entry/contact/profile changes retain unload/discard guards. Regression tests cover failures, late replies, cooldowns, conflicts, deep links and focus restoration; interactive owner QA uses an isolated browser-memory fixture without production writes or email sends.
 
 ## Progressive enhancement and assets
